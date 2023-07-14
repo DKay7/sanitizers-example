@@ -1,9 +1,12 @@
 // trace-pc-guard-cb.cc
+#include <bits/types/FILE.h>
 #include <stdint.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <sanitizer/coverage_interface.h>
 #include <string>
+
+static FILE* trace_output;
 
 // This callback is inserted by the compiler as a module constructor
 // into every DSO. 'start' and 'stop' correspond to the
@@ -12,7 +15,8 @@
 // once per DSO and may be called multiple times with the same parameters.
 extern "C" void __sanitizer_cov_trace_pc_guard_init(uint32_t *start,
                                                     uint32_t *stop) {
-    
+                                                        
+                                                        
     void *PC = __builtin_return_address(0);
     char PcDescr[1024];
     // This function is a part of the sanitizer run-time.
@@ -32,20 +36,19 @@ extern "C" void __sanitizer_cov_trace_pc_guard_init(uint32_t *start,
 // But for large functions it will emit a simple call:
 //    __sanitizer_cov_trace_pc_guard(guard);
 extern "C" void __sanitizer_cov_trace_pc_guard(uint32_t *guard) {
-    if (!*guard) return;  // Duplicate the guard check.
-    // If you set *guard to 0 this code will not be called again for this edge.
-    // Now you can get the PC and do whatever you want:
-    //   store it somewhere or symbolize it and print right away.
-    // The values of `*guard` are as you set them in
-    // __sanitizer_cov_trace_pc_guard_init and so you can make them consecutive
-    // and use them to dereference an array or a bit vector.
-    void *PC = __builtin_return_address(0);
+       // Duplicate the guard check.
+    if (*guard == 0) 
+        return;      
     
+    FILE* trace_file = fopen("isp-compiler.trace", "a");
+    void *PC = __builtin_return_address(0);
+        
     char module_offset[1024];
     __sanitizer_symbolize_pc(PC, "%M", module_offset, sizeof(module_offset));
-    std::string offset_str(module_offset);
+    
+    fprintf(trace_file, "%d;%s\n", *guard, module_offset);
 
-    printf("guard: %p %x PC %s\n", guard, *guard, module_offset);
+    // printf("guard: %p %x PC %s\n", guard, *guard, module_offset);
 }
 
 
